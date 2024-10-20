@@ -24,7 +24,7 @@ public class Request {
     @Size(max=32)
     private String operationUid;
 
-    private String systemName;
+    private Systems systemName;
 
     @NotBlank
     private String systemTime;
@@ -45,5 +45,19 @@ public class Request {
         }
     }
 
+    @Override
+    public String toString() {
+        return "{" +
+                "uid='" + uid + '\'' +
+                ", operationUid='" + operationUid + '\'' +
+                "systemName='" + systemName + '\'' +
+                "systemTime='" + systemTime + '\'' +
+                "source'" + source + '\'' +
+                "communicationId=" + communicationId +
+                "templateId=" + templateId +
+                "productCode=" + productCode +
+                "smsCode" + smsCode +
+                "}";
+    }
 }
 
