@@ -14,7 +14,6 @@ import ru.vertenberger.MySecondTestAppSpringBoot.exception.ValidationFailedExcep
 import ru.vertenberger.MySecondTestAppSpringBoot.exception.UnsupportedCodeException;
 import ru.vertenberger.MySecondTestAppSpringBoot.model.*;
 import ru.vertenberger.MySecondTestAppSpringBoot.service.*;
-import ru.vertenberger.MySecondTestAppSpringBoot.service.ValidationService;
 import ru.vertenberger.MySecondTestAppSpringBoot.util.DateTimeUtil;
 
 import java.util.Date;
@@ -44,7 +43,35 @@ public class MyController {
 
         log.info("request: {}", request);
 
-        Response response = Response.builder()
+        Response response = collectInitialResponse(request);
+
+        try {
+            request.checkUid();
+            validationService.isValid(bindingResult);
+        } catch (UnsupportedCodeException e) {
+            return buildErrorResponse(response, ErrorCodes.UNSUPPORTED_EXCEPTION, ErrorMessages.UNSUPPORTED, HttpStatus.BAD_REQUEST, e);
+        } catch (ValidationFailedException e) {
+            return buildErrorResponse(response, ErrorCodes.VALIDATION_EXCEPTION, ErrorMessages.VALIDATION, HttpStatus.BAD_REQUEST, e);
+        } catch (Exception e) {
+            return buildErrorResponse(response, ErrorCodes.UNKNOWN_EXCEPTION, ErrorMessages.UNKNOWN, HttpStatus.INTERNAL_SERVER_ERROR, e);
+        }
+
+        applyModifications(request, response);
+        log.info("Ответ: {}", response);
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    private ResponseEntity<Response> buildErrorResponse(Response response, ErrorCodes errorCode, ErrorMessages errorMessage, HttpStatus status, Exception e) {
+        log.error("Error occurred: {}", e.getMessage(), e);
+        response.setCode(Codes.FAILED);
+        response.setErrorCode(errorCode);
+        response.setErrorMessage(errorMessage);
+        return new ResponseEntity<>(response, status);
+    }
+
+    private Response collectInitialResponse(Request request) {
+        return Response.builder()
                 .uid(request.getUid())
                 .operationUid(request.getOperationUid())
                 .systemTime(DateTimeUtil.getCustomFormat().format(new Date()))
@@ -52,33 +79,11 @@ public class MyController {
                 .errorCode(ErrorCodes.EMPTY)
                 .errorMessage(ErrorMessages.EMPTY)
                 .build();
-        try {
-            request.checkUid();
-            validationService.isValid(bindingResult);
-        } catch (UnsupportedCodeException e) {
-            log.error("Произошла непредвиденная ошибка {}", e.getMessage());
-            response.setCode(Codes.FAILED);
-            response.setErrorCode(ErrorCodes.UNSUPPORTED_EXCEPTION);
-            response.setErrorMessage(ErrorMessages.UNSUPPORTED);
-            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-        } catch (ValidationFailedException e) {
-            log.error("Ошибка валидации {}", e.getMessage());
-            response.setCode(Codes.FAILED);
-            response.setErrorCode(ErrorCodes.VALIDATION_EXCEPTION);
-            response.setErrorMessage(ErrorMessages.VALIDATION);
-            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-        } catch (Exception e) {
-            log.error("Не поддерживаемая ошибка {}", e.getMessage());
-            response.setCode(Codes.FAILED);
-            response.setErrorCode(ErrorCodes.UNKNOWN_EXCEPTION);
-            response.setErrorMessage(ErrorMessages.UNKNOWN);
-            return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    }
+
+    private void applyModifications(Request request, Response response) {
         modifyResponseService.modify(response);
         modifyRequestService.modify(request);
-        log.info("Ответ: {}", response);
-
-        return new ResponseEntity<>(modifyResponseService.modify(response), HttpStatus.OK);
     }
 }
 
